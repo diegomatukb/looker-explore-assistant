@@ -7,6 +7,9 @@ import { RootState } from '../store'
 import process from 'process'
 import { useErrorBoundary } from 'react-error-boundary'
 import { AssistantState } from '../slices/assistantSlice'
+import { useDispatch } from 'react-redux'
+import { setIsQuerying, updateCurrentThread, addMessage } from '../slices/assistantSlice'
+import { v4 as uuidv4 } from 'uuid'
 
 const unquoteResponse = (response: string | null | undefined) => {
   if(!response) {
@@ -391,12 +394,75 @@ ${exploreRefinementExamples && exploreRefinementExamples
     }
   }
 
+  const isDirectAnswerQuestion = useCallback(async (prompt: string) => {
+    const contents = `
+      Primer
+      ----------
+      A user is asking questions about data. Determine if this question requires generating a data visualization/explore URL or if it can be answered with a direct value/statement.
+
+      Examples of direct answer questions:
+      - "What was the total sales last month?"
+      - "How many customers do we have?"
+      - "What's our average order value?"
+      - "Which product has the highest sales?"
+
+      Examples of explore questions:
+      - "Show me sales trends over time"
+      - "Compare revenue by region"
+      - "Visualize customer distribution"
+      - "Break down orders by category"
+
+      Task
+      ----------
+      The user asked: "${prompt}"
+
+      Output
+      ----------
+      Return only "direct_answer" if the question can be answered with a single value/statement, or "needs_explore" if it requires data visualization/exploration.
+    `
+    const response = await sendMessage(contents, {})
+    return response.trim() === 'direct_answer'
+  }, [])
+
+  const getDirectAnswer = useCallback(async (
+    prompt: string,
+    dimensions: any[],
+    measures: any[],
+  ) => {
+    const contents = `
+      Context
+      ----------
+      You are an analyst who can query data and provide direct answers based on the following metadata.
+
+      LookML Metadata
+      ----------
+      Dimensions:
+      ${dimensions.map(formatContent).join('\n')}
+
+      Measures:
+      ${measures.map(formatContent).join('\n')}
+
+      Task
+      ----------
+      Answer the following question concisely in plain English using the available fields:
+      "${prompt}"
+
+      Only return the answer, no additional explanation or SQL. If you cannot answer this question with the available data, say "I cannot answer this question with the available data."
+    `
+    const response = await sendMessage(contents, {
+      max_output_tokens: 1000,
+    })
+    return response.trim()
+  }, [])
+
   return {
     generateExploreUrl,
     sendMessage,
     summarizePrompts,
     isSummarizationPrompt,
     summarizeExplore,
+    isDirectAnswerQuestion,
+    getDirectAnswer,
   }
 }
 

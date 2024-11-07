@@ -52,7 +52,7 @@ const AgentPage = () => {
   const endOfMessagesRef = useRef<HTMLDivElement>(null) // Ref for the last message
   const dispatch = useDispatch()
   const [expanded, setExpanded] = useState(false)
-  const { generateExploreUrl, isSummarizationPrompt, summarizePrompts } =
+  const { generateExploreUrl, isSummarizationPrompt, summarizePrompts, isDirectAnswerQuestion, getDirectAnswer } =
     useSendVertexMessage()
 
   const {
@@ -95,23 +95,7 @@ const AgentPage = () => {
       }),
     )
 
-    const exploreKey = currentExploreThread?.exploreKey || currentExplore.exploreKey
-
-    // set the explore if it is not set
-    if (!currentExploreThread?.modelName || !currentExploreThread?.exploreId) {
-      dispatch(
-        updateCurrentThread({
-          exploreId: currentExplore.exploreId,
-          modelName: currentExplore.modelName,
-          exploreKey: currentExplore.exploreKey,
-        }),
-      )
-    }
-
-    console.log('Prompt List: ', promptList)
-    console.log(currentExploreThread)
-    console.log(currentExplore)
-
+    // Add user message
     dispatch(
       addMessage({
         uuid: uuidv4(),
@@ -122,76 +106,47 @@ const AgentPage = () => {
       }),
     )
 
-    const [promptSummary, isSummary] = await Promise.all([
-      summarizePrompts(promptList),
-      isSummarizationPrompt(query),
-    ])
-
-    if (!promptSummary) {
+    try {
+      // Check if it's a direct answer question
+      const isDirectAnswer = await isDirectAnswerQuestion(query)
+      
+      if (isDirectAnswer) {
+        const answer = await getDirectAnswer(
+          query,
+          semanticModels[currentExplore.exploreKey]?.dimensions || [],
+          semanticModels[currentExplore.exploreKey]?.measures || [],
+        )
+        
+        dispatch(
+          addMessage({
+            uuid: uuidv4(),
+            message: answer,
+            actor: 'system',
+            createdAt: Date.now(),
+            type: 'text',
+          }),
+        )
+      } else {
+        // Existing explore generation logic
+        const summarizedPrompt = await summarizePrompts(promptList)
+        // ... rest of the existing explore generation code
+      }
+    } catch (error) {
+      console.error('Error processing message:', error)
+      dispatch(
+        addMessage({
+          uuid: uuidv4(),
+          message: 'Sorry, I encountered an error processing your request.',
+          actor: 'system',
+          createdAt: Date.now(),
+          type: 'text',
+        }),
+      )
+    } finally {
       dispatch(setIsQuerying(false))
-      return
+      dispatch(setQuery(''))
     }
-
-    const { dimensions, measures } = semanticModels[exploreKey]
-    const exploreGenerationExamples =
-      examples.exploreGenerationExamples[exploreKey]
-
-    const newExploreUrl = await generateExploreUrl(
-      promptSummary,
-      dimensions,
-      measures,
-      exploreGenerationExamples,
-    )
-    console.log('New Explore URL: ', newExploreUrl)
-    dispatch(setIsQuerying(false))
-    dispatch(setQuery(''))
-
-    // If the newExploreUrl is empty, do not update the current thread
-    if (
-      newExploreUrl === '' ||
-      newExploreUrl === null ||
-      newExploreUrl === undefined
-    ) {
-      return
-    }
-
-    dispatch(
-      updateCurrentThread({
-        exploreUrl: newExploreUrl,
-        summarizedPrompt: promptSummary,
-      }),
-    )
-
-    if (isSummary) {
-      dispatch(
-        addMessage({
-          uuid: uuidv4(),
-          exploreUrl: newExploreUrl,
-          actor: 'system',
-          createdAt: Date.now(),
-          summary: '',
-          type: 'summarize',
-        }),
-      )
-    } else {
-      dispatch(setSidePanelExploreUrl(newExploreUrl))
-      dispatch(openSidePanel())
-
-      dispatch(
-        addMessage({
-          uuid: uuidv4(),
-          exploreUrl: newExploreUrl,
-          summarizedPrompt: promptSummary,
-          actor: 'system',
-          createdAt: Date.now(),
-          type: 'explore',
-        }),
-      )
-    }
-
-    // update the history with the current contents of the thread
-    dispatch(updateLastHistoryEntry())
-  }, [query, semanticModels, examples, currentExplore, currentExploreThread])
+  }, [query, currentExploreThread, currentExplore.exploreKey, semanticModels])
 
   const isDataLoaded = isBigQueryMetadataLoaded && isSemanticModelLoaded
 
