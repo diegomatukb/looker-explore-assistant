@@ -129,7 +129,27 @@ const AgentPage = () => {
       } else {
         // Existing explore generation logic
         const summarizedPrompt = await summarizePrompts(promptList)
-        // ... rest of the existing explore generation code
+        const exploreUrl = await generateExploreUrl(
+          summarizedPrompt,
+          semanticModels[currentExplore.exploreKey]?.dimensions || [],
+          semanticModels[currentExplore.exploreKey]?.measures || [],
+          examples.exploreGenerationExamples[currentExplore.exploreKey] || [],
+        )
+
+        if (exploreUrl) {
+          dispatch(
+            addMessage({
+              uuid: uuidv4(),
+              message: summarizedPrompt,
+              actor: 'system',
+              createdAt: Date.now(),
+              type: 'explore',
+              exploreUrl: exploreUrl,
+              modelName: currentExplore.modelName,
+              exploreId: currentExplore.exploreId,
+            }),
+          )
+        }
       }
     } catch (error) {
       console.error('Error processing message:', error)
