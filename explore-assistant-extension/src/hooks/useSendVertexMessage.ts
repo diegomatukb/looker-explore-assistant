@@ -53,23 +53,8 @@ const generateSQL = (
       `
 }
 
-function formatContent(field: {
-  name?: string
-  type?: string
-  label?: string
-  description?: string
-  tags?: string[]
-}) {
-  let result = ''
-  if (field.name) result += 'name: ' + field.name
-  if (field.type) result += (result ? ', ' : '') + 'type: ' + field.type
-  if (field.label) result += (result ? ', ' : '') + 'label: ' + field.label
-  if (field.description)
-    result += (result ? ', ' : '') + 'description: ' + field.description
-  if (field.tags && field.tags.length)
-    result += (result ? ', ' : '') + 'tags: ' + field.tags.join(', ')
-
-  return result
+const formatContent = (field: any) => {
+  return `- ${field.name}: ${field.description || field.label} ${field.tags ? '(tags: ' + field.tags.join(', ') + ')' : ''}`
 }
 
 const useSendVertexMessage = () => {

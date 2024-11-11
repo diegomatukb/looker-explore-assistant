@@ -166,7 +166,17 @@ const AgentPage = () => {
       dispatch(setIsQuerying(false))
       dispatch(setQuery(''))
     }
-  }, [query, currentExploreThread, currentExplore.exploreKey, semanticModels])
+  }, [
+    query, 
+    currentExploreThread, 
+    currentExplore, 
+    semanticModels, 
+    examples,
+    generateExploreUrl,
+    summarizePrompts,
+    isDirectAnswerQuestion,
+    getDirectAnswer
+  ])
 
   const isDataLoaded = isBigQueryMetadataLoaded && isSemanticModelLoaded
 
