@@ -75,10 +75,7 @@ const useSendVertexMessage = () => {
   const currentExploreKey = currentExplore.exploreKey
   const exploreRefinementExamples = examples.exploreRefinementExamples[currentExploreKey]
 
-  const vertextBigQuery = async (
-    contents: string,
-    parameters: ModelParameters,
-  ) => {
+  const vertextBigQuery = async (contents: string, parameters: ModelParameters) => {
     const createSQLQuery = await core40SDK.ok(
       core40SDK.create_sql_query({
         connection_name: VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME,
@@ -86,20 +83,20 @@ const useSendVertexMessage = () => {
       }),
     )
 
-    if (createSQLQuery.slug) {
-      const runSQLQuery = await core40SDK.ok(
-        core40SDK.run_sql_query(createSQLQuery.slug, 'json'),
-      )
-      const exploreData = await runSQLQuery[0]['generated_content']
-
-      // clean up the data by removing backticks
-      const cleanExploreData = exploreData
-        .replace(/```json/g, '')
-        .replace(/```/g, '')
-        .trim()
-
-      return cleanExploreData
+    if (!createSQLQuery.slug) {
+      throw new Error('Failed to create SQL query')
     }
+
+    const runSQLQuery = await core40SDK.ok(
+      core40SDK.run_sql_query(createSQLQuery.slug, 'json'),
+    )
+
+    if (!runSQLQuery || !runSQLQuery[0] || !runSQLQuery[0]['generated_content']) {
+      throw new Error('Invalid response structure from BigQuery')
+    }
+
+    const exploreData = runSQLQuery[0]['generated_content']
+    return exploreData.trim()
   }
 
   const vertextCloudFunction = async (
@@ -363,31 +360,19 @@ ${exploreRefinementExamples && exploreRefinementExamples
 
   const sendMessage = async (message: string, parameters: ModelParameters) => {
     try {
-      let response = ''
-      
-      // First check if we have any valid configuration
-      if (!VERTEX_AI_ENDPOINT && !VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME) {
-        throw new Error('No LLM configuration found. Please check your environment variables.')
+      if (!VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME || !VERTEX_BIGQUERY_MODEL_ID) {
+        throw new Error('BigQuery configuration missing - check your environment variables')
       }
 
-      // Try Cloud Function first
-      if (VERTEX_AI_ENDPOINT && VERTEX_CF_AUTH_TOKEN) {
-        response = await vertextCloudFunction(message, parameters)
-      } 
-      // Fallback to BigQuery
-      else if (VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME && VERTEX_BIGQUERY_MODEL_ID) {
-        response = await vertextBigQuery(message, parameters)
-      }
-
-      // Only throw if we got no response after trying both methods
+      const response = await vertextBigQuery(message, parameters)
       if (!response) {
-        throw new Error('No response received from either Cloud Function or BigQuery LLM')
+        throw new Error('Empty response from BigQuery')
       }
-
       return response
     } catch (error) {
-      console.error('Error in sendMessage:', error)
-      throw error // Let the error boundary handle it
+      console.error('BigQuery Error:', error)
+      // Let the error propagate up to show the proper error message in ErrorFallback
+      throw error
     }
   }
 
