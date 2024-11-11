@@ -366,16 +366,19 @@ ${exploreRefinementExamples && exploreRefinementExamples
       let response = ''
       if (VERTEX_AI_ENDPOINT) {
         response = await vertextCloudFunction(message, parameters)
+      } else if (VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME && VERTEX_BIGQUERY_MODEL_ID) {
+        response = await vertextBigQuery(message, parameters)
       }
 
-      if (VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME && VERTEX_BIGQUERY_MODEL_ID) {
-        response = await vertextBigQuery(message, parameters)
+      if (!response) {
+        throw new Error('No response received from LLM')
       }
 
       return response
     } catch (error) {
+      console.error('Error in sendMessage:', error)
       showBoundary(error)
-      return
+      return ''
     }
   }
 
