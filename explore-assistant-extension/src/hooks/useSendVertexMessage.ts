@@ -364,21 +364,30 @@ ${exploreRefinementExamples && exploreRefinementExamples
   const sendMessage = async (message: string, parameters: ModelParameters) => {
     try {
       let response = ''
-      if (VERTEX_AI_ENDPOINT) {
+      
+      // First check if we have any valid configuration
+      if (!VERTEX_AI_ENDPOINT && !VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME) {
+        throw new Error('No LLM configuration found. Please check your environment variables.')
+      }
+
+      // Try Cloud Function first
+      if (VERTEX_AI_ENDPOINT && VERTEX_CF_AUTH_TOKEN) {
         response = await vertextCloudFunction(message, parameters)
-      } else if (VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME && VERTEX_BIGQUERY_MODEL_ID) {
+      } 
+      // Fallback to BigQuery
+      else if (VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME && VERTEX_BIGQUERY_MODEL_ID) {
         response = await vertextBigQuery(message, parameters)
       }
 
+      // Only throw if we got no response after trying both methods
       if (!response) {
-        throw new Error('No response received from LLM')
+        throw new Error('No response received from either Cloud Function or BigQuery LLM')
       }
 
       return response
     } catch (error) {
       console.error('Error in sendMessage:', error)
-      showBoundary(error)
-      return ''
+      throw error // Let the error boundary handle it
     }
   }
 
