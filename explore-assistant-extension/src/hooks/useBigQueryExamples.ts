@@ -34,19 +34,24 @@ export const useBigQueryExamples = () => {
           connection_name: connectionName,
           sql: sql,
         }),
-        )
-        const { slug } = await createSqlQuery
-        if (slug) {
-          const runSQLQuery = await core40SDK.ok(
-            core40SDK.run_sql_query(slug, 'json'),
-            )
-            const examples = await runSQLQuery
-            return examples
-          }
-          return []
-    } catch(error) {
-      showBoundary(error)
-      throw new Error('error')
+      )
+
+      if (!createSqlQuery.slug) {
+        throw new Error('Failed to create SQL query')
+      }
+
+      const runQuery = await core40SDK.ok(
+        core40SDK.run_sql_query(createSqlQuery.slug, 'json'),
+      )
+
+      if (!runQuery || !Array.isArray(runQuery) || runQuery.length === 0) {
+        throw new Error('No data returned from query')
+      }
+
+      return runQuery
+    } catch (error) {
+      console.error('BigQuery Error:', error)
+      throw error // Let it propagate up
     }
   }
 

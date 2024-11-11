@@ -361,18 +361,21 @@ ${exploreRefinementExamples && exploreRefinementExamples
   const sendMessage = async (message: string, parameters: ModelParameters) => {
     try {
       if (!VERTEX_BIGQUERY_LOOKER_CONNECTION_NAME || !VERTEX_BIGQUERY_MODEL_ID) {
-        throw new Error('BigQuery configuration missing - check your environment variables')
+        throw new Error('Missing required BigQuery configuration')
       }
 
       const response = await vertextBigQuery(message, parameters)
-      if (!response) {
-        throw new Error('Empty response from BigQuery')
-      }
       return response
     } catch (error) {
-      console.error('BigQuery Error:', error)
-      // Let the error propagate up to show the proper error message in ErrorFallback
-      throw error
+      if (error instanceof Error) {
+        // Check for specific BigQuery errors
+        if (error.message.includes('BQSQLException')) {
+          throw error // Let ErrorFallback handle it
+        }
+        // For other errors, return a user-friendly message
+        return 'I apologize, but I cannot process your request at the moment. Please try again.'
+      }
+      return 'An unexpected error occurred.'
     }
   }
 

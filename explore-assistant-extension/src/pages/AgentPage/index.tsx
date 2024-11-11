@@ -153,10 +153,17 @@ const AgentPage = () => {
       }
     } catch (error) {
       console.error('Error processing message:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+      
+      // Only show the generic error for non-BigQuery errors
+      const userMessage = errorMessage.includes('BQSQLException') 
+        ? errorMessage 
+        : 'Sorry, I encountered an error processing your request.'
+      
       dispatch(
         addMessage({
           uuid: uuidv4(),
-          message: 'Sorry, I encountered an error processing your request.',
+          message: userMessage,
           actor: 'system',
           createdAt: Date.now(),
           type: 'text',
